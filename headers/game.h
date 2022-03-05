@@ -12,9 +12,9 @@ class Game {
         width = width_p; height = height_p; 
         board = board_p; 
     }
+    #include "move-gen.h"
     void move(Move move) {
         board[move.dst] = board[move.src]; 
         board[move.src] = 0; 
     } 
-    #include "move-gen.h"
 };
