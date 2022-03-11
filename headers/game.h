@@ -14,7 +14,8 @@ class Game {
     }
     #include "move-gen.h"
     void move(Move move) {
-        board[move.dst] = board[move.src]; 
+        int src = board[move.src];
         board[move.src] = 0; 
+        board[move.dst] = src; 
     } 
 };

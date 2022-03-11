@@ -3,19 +3,32 @@
 #include <cmath>
 #include "headers/game.h"
 int main() {
-	int num[2] = {7, 7}; 
-	// 0 = blank, 1, = wall, 2 = valley, 3 = white stone, 4 = black stone, 5 = white king, 6 = black king, 6 = wall
+	// 0 = blank, 1, = wall, 2 = valley, 3 = white stone, 4 = black stone, 5 = white king, 6 = black king
+	// std::vector<char> board = {
+		// 4, 4, 4, 4, 5, 4, 4, 4, 4,
+		// 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		// 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		// 3, 0, 1, 0, 0, 0, 1, 0, 0,
+		// 0, 0, 0, 0, 2, 0, 0, 0, 0,
+		// 0, 0, 1, 0, 0, 0, 1, 0, 4,
+		// 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		// 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		// 3, 3, 3, 3, 6, 3, 3, 3, 3
+	// };
+	// int num[2] = {9, 9};
 	std::vector<char> board = {
-		4, 4, 4, 5, 4, 4, 4,
+		4, 4, 4, 5, 4, 4, 4, 
 		0, 0, 0, 0, 0, 0, 0,
 		0, 1, 0, 0, 0, 1, 0,
 		0, 0, 0, 2, 0, 0, 0,
 		0, 1, 0, 0, 0, 1, 0,
 		0, 0, 0, 0, 0, 0, 0,
-		3, 3, 3, 6, 3, 3, 3,
+		3, 3, 3, 6, 3, 3, 3, 
+
 	}; 
-	Game game(7, 7, board); 
-	// game.move_gen(); 
+	int num[2] = {7, 7}; 
+	Game game(num[0], num[1], board); 
+	// game.move_gen();  
 	// if(game.moves.size() > 0) {
 	// 	std::cout << game.moves[0].src << ", " << game.moves[1].dst << std::endl; 
 	// }
@@ -35,15 +48,22 @@ int main() {
 	int wall_colors[3] = {90, 67, 49};
 	int border_wall_colors[3] = {240, 217, 181}; 
 
+	int step_colors[2][3] = {{0, 0, 0}, {255, 255, 255}}; 
+	int border_step_colors[2][3] = {{0, 0, 0}, {255, 255, 255}}; 
+
 	int valley_colors[3] = {240-20, 217-20, 181-20};
 
 	float stone_size = 1/2.8; 
 	float king_size = 1/1.5; 
 	float wall_size = 1/1.5;
+	float step_size = 1/1.6; 
 
 	float stone_border_size = 1.0f/70.0f; 
 	float king_border_size = 1.0f/70.0f; 
 	float wall_border_size = 1.0f/70.0f; 
+	float step_border_size = 1.0f/70.0f; 
+
+	float select_color[2] = {-1/8.0f, 1/4.0f};
 
 
 	bool smaller = 0; 
@@ -51,6 +71,7 @@ int main() {
 	std::vector<int> mouse_pos_2 = {0, 0}; 
 	bool mouse_clicked_1 = false; 
 	bool mouse_clicked_2 = false; 
+	
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = 15; 
 	sf::RenderWindow window(sf::VideoMode(window_size[0], window_size[1]), "Kings Valley", sf::Style::Default, settings);
@@ -70,13 +91,18 @@ int main() {
         		window.setView(sf::View(visibleArea));
 			}
 			if(event.type == sf::Event::MouseButtonPressed) {
-				if(mouse_clicked_1) {
-					mouse_clicked_2 = true; 
-					mouse_pos_2 = {event.mouseButton.x, event.mouseButton.y}; 
+				if (sf::Mouse::isButtonPressed(sf::Mouse::Right)) {
+					mouse_clicked_1 = false; 
 				}
 				else {
-					mouse_clicked_1 = true; 
-					mouse_pos_1 = {event.mouseButton.x, event.mouseButton.y}; 
+					if(mouse_clicked_1) {
+						mouse_clicked_2 = true; 
+						mouse_pos_2 = {event.mouseButton.x, event.mouseButton.y}; 
+					}
+					else {
+						mouse_clicked_1 = true; 
+						mouse_pos_1 = {event.mouseButton.x, event.mouseButton.y}; 
+					}
 				}
 				
 			}
@@ -90,6 +116,13 @@ int main() {
 				sf::RectangleShape square(sf::Vector2f(square_size, square_size));
 				square.setPosition(pos[0], pos[1]); 
 				square.setFillColor(sf::Color(colors[even][0], colors[even][1], colors[even][2]));
+				if(mouse_clicked_1) {
+					int x_1 = floor(mouse_pos_1[0] / square_size); 
+					int y_1 = floor(mouse_pos_1[1] / square_size); 
+					if(i == y_1 && j == x_1) {
+						square.setFillColor(sf::Color(colors[even][0] + (255 - colors[even][0])*select_color[even], colors[even][1] + (255 - colors[even][1])*select_color[even], colors[even][2] + (255 - colors[even][2])*select_color[even]));
+					}
+				}
 				window.draw(square); 
 				switch(board[j + i*num[0]]) {
 					case 3: 
@@ -152,8 +185,6 @@ int main() {
 						window.draw(square); 
 						break; 
 						}
-
-
 				}
 				pos[bigger] += square_size; 
 				even = 1 - even; 
