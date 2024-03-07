@@ -25,10 +25,10 @@ Color piece_colors[2] = {
 
 typedef struct {
   enum {
-    PIECE_EMPTY = 0,
-    PIECE_PILLAR,
-    PIECE_SOLDIER,
-    PIECE_KING,
+    P_EMPTY = 0,
+    P_PILLAR,
+    P_SOLDIER,
+    P_KING,
   } type;
   bool color;
   bool win;
@@ -54,8 +54,11 @@ void gen_moves(Game *game) {
       Square *src = &game->buf[src_x][src_y];
       Moves *moves = &game->moves[src_x][src_y];
 
+      moves->num_moves = 0;
+
+      if (src->type != P_SOLDIER && src->type != P_KING) continue;
       if (src->color != game->turn_num % 2) continue;
-      if (game->turn_num == 1 && src->type != PIECE_KING) continue;
+      if (game->turn_num == 1 && src->type == P_KING) continue;
 
       int offs[8][2] = {
         { 0, 1 },
@@ -83,7 +86,7 @@ void gen_moves(Game *game) {
         x -= offs[i][0];
         y -= offs[i][1];
 
-        if (game->buf[x][y].win && src->type != PIECE_KING) break;
+        if (game->buf[x][y].win && src->type != P_KING) break;
 
         if (x != src_x || y != src_y) {
           moves->c[moves->num_moves][0] = x;
@@ -99,12 +102,6 @@ void gen_moves(Game *game) {
 void fill_from_fen(Game *game, char *fen) {
   memset(game, 0, sizeof(*game));
   game->turn_num = 1;
-
-  for (int x = 0; x < BOARD_WIDTH; x++) {
-    for (int y = 0; y < BOARD_HEIGHT; y++) {
-      game->buf[x][y].color = -1;
-    }
-  }
 
   size_t fen_len = strlen(fen);
   int pos_x = 0, pos_y = 0;
@@ -134,24 +131,26 @@ void fill_from_fen(Game *game, char *fen) {
     switch (fen[i]) {
     case 's': {
       cur_square->color = 0;
-      cur_square->type = PIECE_SOLDIER;
+      cur_square->type = P_SOLDIER;
     } break;
     case 'k': {
       cur_square->color = 0;
-      cur_square->type = PIECE_KING;
+      cur_square->type = P_KING;
     } break;
     case 'S': {
       cur_square->color = 1;
-      cur_square->type = PIECE_SOLDIER;
+      cur_square->type = P_SOLDIER;
     } break;
     case 'K': {
       cur_square->color = 1;
-      cur_square->type = PIECE_KING;
+      cur_square->type = P_KING;
     } break;
     case 'p': {
-      cur_square->type = PIECE_PILLAR;
+      cur_square->color = 0;
+      cur_square->type = P_PILLAR;
     } break;
     case 'v': {
+      cur_square->color = 0;
       cur_square->win = true;
     } break;
     }
@@ -300,18 +299,18 @@ int main(void) {
             .height = size,
           };
 
-          if (game.buf[x][y].type == PIECE_SOLDIER) {
+          if (game.buf[x][y].type == P_SOLDIER) {
             DrawCircle(pos_x, pos_y, size/2, pcolor);
             rlSetLineWidth(2);
             DrawCircleLines(pos_x, pos_y, size/2, bcolor);
           }
 
-          if (game.buf[x][y].type == PIECE_KING) {
+          if (game.buf[x][y].type == P_KING) {
             DrawRectangleRec(rect, pcolor);
             DrawRectangleLinesEx(rect, 2, bcolor);
           }
 
-          if (game.buf[x][y].type == PIECE_PILLAR) {
+          if (game.buf[x][y].type == P_PILLAR) {
             DrawRectangleRec(rect, BEIGE);
             DrawRectangleLinesEx(rect, 2, bcolor);
           }
