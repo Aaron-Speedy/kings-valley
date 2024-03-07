@@ -86,7 +86,7 @@ void gen_moves(Game *game) {
         x -= offs[i][0];
         y -= offs[i][1];
 
-        if (game->buf[x][y].win && src->type != P_KING) break;
+        if (game->buf[x][y].win && src->type != P_KING) continue;
 
         if (x != src_x || y != src_y) {
           moves->c[moves->num_moves][0] = x;
