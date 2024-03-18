@@ -1,4 +1,5 @@
 #include <raylib.h>
+#include <raymath.h>
 #include <rlgl.h>
 
 #include <assert.h>
@@ -7,6 +8,9 @@
 
 #define UTILS_IMPL
 #include "utils.h"
+
+#define UI_IMPL
+#include "ui.h"
 
 #define BOARD_WIDTH 7
 #define BOARD_HEIGHT 7
@@ -51,24 +55,24 @@ typedef struct {
 void gen_moves(Game *game) {
   for (int src_x = 0; src_x < BOARD_WIDTH; src_x++) {
     for (int src_y = 0; src_y < BOARD_HEIGHT; src_y++) {
-      Square *src = &game->buf[src_x][src_y];
+      Square *src_s = &game->buf[src_x][src_y];
       Moves *moves = &game->moves[src_x][src_y];
 
       moves->num_moves = 0;
 
-      if (src->type != P_SOLDIER && src->type != P_KING) continue;
-      if (src->color != game->turn_num % 2) continue;
-      if (game->turn_num == 1 && src->type == P_KING) continue;
+      if (src_s->type != P_SOLDIER && src_s->type != P_KING) continue;
+      if (src_s->color != game->turn_num % 2) continue;
+      if (game->turn_num == 1 && src_s->type == P_KING) continue;
 
       int offs[8][2] = {
-        { 0, 1 },
-        { 0, -1 },
-        { 1, 0 },
         { -1, 0 },
-        { 1, 1 },
-        { 1, -1 },
-        { -1, 1 },
         { -1, -1 },
+        { 0, -1 },
+        { 1, -1 },
+        { 1, 0 },
+        { 1, 1 },
+        { 0, 1 },
+        { -1, 1 },
       };
       for (int i = 0; i < 8; i++) {
         int x = src_x;
@@ -86,7 +90,7 @@ void gen_moves(Game *game) {
         x -= offs[i][0];
         y -= offs[i][1];
 
-        if (game->buf[x][y].win && src->type != P_KING) continue;
+        if (game->buf[x][y].win && src_s->type != P_KING) continue;
 
         if (x != src_x || y != src_y) {
           moves->c[moves->num_moves][0] = x;
@@ -94,7 +98,6 @@ void gen_moves(Game *game) {
           moves->num_moves += 1;
         }
       }
-
     }
   }
 }
@@ -158,6 +161,52 @@ void fill_from_fen(Game *game, char *fen) {
   }
 }
 
+void draw_square(Game *game, int x, int y, float unit, Color s_color) {
+  // Square
+  if (s_color.a == 0) {
+    s_color = square_colors[(x + y + 1) % 2];
+  }
+  if (game->buf[x][y].win) {
+    s_color = GOLD;
+  }
+
+  DrawRectangle(
+    x * unit, y * unit,
+    unit, unit,
+    s_color
+  );
+
+  // Piece
+  float pos_x = (x + 0.5) * unit;
+  float pos_y = (y + 0.5) * unit;
+  float size = unit * 0.8;
+  Color bcolor = piece_colors[0];
+  Color pcolor = piece_colors[game->buf[x][y].color];
+
+  Rectangle rect = {
+    .x = pos_x - size/2,
+    .y = pos_y - size/2,
+    .width = size,
+    .height = size,
+  };
+
+  if (game->buf[x][y].type == P_SOLDIER) {
+    DrawCircle(pos_x, pos_y, size/2, pcolor);
+    rlSetLineWidth(2);
+    DrawCircleLines(pos_x, pos_y, size/2, bcolor);
+  }
+
+  if (game->buf[x][y].type == P_KING) {
+    DrawRectangleRec(rect, pcolor);
+    DrawRectangleLinesEx(rect, 2, bcolor);
+  }
+
+  if (game->buf[x][y].type == P_PILLAR) {
+    DrawRectangleRec(rect, BEIGE);
+    DrawRectangleLinesEx(rect, 2, bcolor);
+  }
+}        
+
 int main(void) {
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   int window_width = 800, window_height = 600;
@@ -165,77 +214,90 @@ int main(void) {
   SetTargetFPS(60);
   SetExitKey(KEY_Q);
 
-  Game game;
-  fill_from_fen(&game, "sssksss//1p3p1/3v3/1p3p1//SSSKSSS");
+  regular_font = LoadFontEx("recs/regular.ttf", 20, 0, 0);
 
-  int move_index = 0;
+  Game game;
+  char *fen = "sssKsss//1p3p1/3v3/1p3p1//SSSkSSS";
+  fill_from_fen(&game, fen);
 
   enum {
     MODE_SRC,
     MODE_TARGET,
+    MODE_END_MENU,
   } mode = MODE_SRC;
-  int src_x = 0, src_y = 0;
-  int sel_x = 0, sel_y = 0;
+
+  Vec2I src = { 0, 0, };
+  Vec2I sel = { 0, 0, };
 
   while (!WindowShouldClose()) {
     /* ===== Input ===== */
     {
-      int vel_x = 0, vel_y = 0;
+      Vec2I vel = { 0, 0, };
 
-      if (IsKeyPressed(KEY_H)) vel_x -= 1;
-      if (IsKeyPressed(KEY_J)) vel_y += 1;
-      if (IsKeyPressed(KEY_K)) vel_y -= 1;
-      if (IsKeyPressed(KEY_L)) vel_x += 1;
+      if (IsKeyPressed(KEY_H)) vel.x -= 1;
+      if (IsKeyPressed(KEY_J)) vel.y += 1;
+      if (IsKeyPressed(KEY_K)) vel.y -= 1;
+      if (IsKeyPressed(KEY_L)) vel.x += 1;
+
+      if (in_bounds(sel.x + vel.x, BOARD_WIDTH)) sel.x += vel.x;
+      if (in_bounds(sel.y + vel.y, BOARD_HEIGHT)) sel.y += vel.y;
 
       switch (mode) {
       case MODE_SRC: {
-        if (in_bounds(sel_x + vel_x, BOARD_WIDTH)) sel_x += vel_x;
-        if (in_bounds(sel_y + vel_y, BOARD_HEIGHT)) sel_y += vel_y;
-
         if (IsKeyPressed(KEY_SPACE)) {
+          src.x = sel.x;
+          src.y = sel.y;
+
           gen_moves(&game);
-
-          src_x = sel_x;
-          src_y = sel_y;
-
-          Moves *moves = &game.moves[src_x][src_y];
-
+          Moves *moves = &game.moves[src.x][src.y];
           if (moves->num_moves > 0) {
             mode = MODE_TARGET;
-            move_index = 0;
-            sel_x = moves->c[move_index][0];
-            sel_y = moves->c[move_index][1];
           }
         }
       } break;
 
       case MODE_TARGET: {
         if (IsKeyPressed(KEY_SPACE)) {
-          game.buf[sel_x][sel_y].type =
-            game.buf[src_x][src_y].type;
-          game.buf[sel_x][sel_y].color =
-            game.buf[src_x][src_y].color;
+          Moves *moves = &game.moves[src.x][src.y];
 
-          game.buf[src_x][src_y].type = 0;
-          game.buf[src_x][src_y].color = -1;
+          bool found = false;
 
-          mode = MODE_SRC;
-          game.turn_num += 1;
+          for (int i = 0; i < moves->num_moves; i++) {
+            if (moves->c[i][0] == sel.x && moves->c[i][1] == sel.y) {
+              found = true;
+            }
+          }
+
+          if (found) {
+            Square *new = &game.buf[sel.x][sel.y];
+
+            new->type = game.buf[src.x][src.y].type;
+            new->color = game.buf[src.x][src.y].color;
+
+            game.buf[src.x][src.y].type = 0;
+            game.buf[src.x][src.y].color = -1;
+
+            mode = MODE_SRC;
+            game.turn_num += 1;
+
+            // Check win
+            if (new->type == P_KING && new->win) mode = MODE_END_MENU;
+          }
+          break;
         }
-
-        Moves *moves = &game.moves[src_x][src_y];
-        if (in_bounds(move_index + vel_x, moves->num_moves)) {
-          move_index += vel_x;
-          sel_x = moves->c[move_index][0];
-          sel_y = moves->c[move_index][1];
+        if (IsKeyPressed(KEY_ESCAPE)) {
+          mode = MODE_SRC;
         }
       } break;
       }
     }
+
     /* ===== Drawing ===== */
     BeginDrawing();
     ClearBackground(BG_COLOR);
     {
+      float board_size = min(window_width, window_height);
+
       float unit = min(
         window_width / BOARD_WIDTH,
         window_height / BOARD_HEIGHT
@@ -243,36 +305,29 @@ int main(void) {
 
       for (int x = 0; x < BOARD_WIDTH; x++) {
         for (int y = 0; y < BOARD_HEIGHT; y++) {
-          DrawRectangle(
-            x * unit, y * unit,
-            unit, unit,
-            square_colors[(x + y + 1) % 2]
-          );
-
-          if (game.buf[x][y].win) {
-            DrawRectangle(
-              x * unit, y * unit,
-              unit, unit,
-              GOLD
-            );
-          }
+          draw_square(&game, x, y, unit, BLANK);
         }
       }
 
-      {
-        if (mode == MODE_TARGET) {
-          DrawRectangle(
-            src_x * unit,
-            src_y * unit,
-            unit,
-            unit,
-            (Color) { 0, 255, 0, 100, }
+      if (mode == MODE_TARGET) {
+        Color src_color = { 0, 255, 0, 100, };
+        draw_square(&game, src.x, src.y, unit, src_color);
+
+        Moves *moves = &game.moves[src.x][src.y];
+        for (int i = 0; i < moves->num_moves; i++) {
+          DrawCircle(
+            (moves->c[i][0] + 0.5) * unit,
+            (moves->c[i][1] + 0.5) * unit,
+            unit * 0.2,
+            (Color) { 50, 50, 50, 50, }
           );
         }
+      }
 
+      if (mode == MODE_TARGET || mode == MODE_SRC) {
         Rectangle rect = {
-          .x = sel_x * unit,
-          .y = sel_y * unit,
+          .x = sel.x * unit,
+          .y = sel.y * unit,
           .width = unit,
           .height = unit,
         };
@@ -284,48 +339,60 @@ int main(void) {
         );
       }
 
-      for (int x = 0; x < BOARD_WIDTH; x++) {
-        for (int y = 0; y < BOARD_HEIGHT; y++) {
-          float pos_x = (x + 0.5) * unit;
-          float pos_y = (y + 0.5) * unit;
-          float size = unit * 0.8;
-          Color bcolor = piece_colors[0];
-          Color pcolor = piece_colors[game.buf[x][y].color];
+      if (mode == MODE_END_MENU) {
+        Rectangle rect = {
+          .width = board_size * 0.7,
+          .height = board_size * 0.5,
+        };
+        rect.x = (board_size - rect.width)/2;
+        rect.y = (board_size - rect.height)/2;
 
-          Rectangle rect = {
-            .x = pos_x - size/2,
-            .y = pos_y - size/2,
-            .width = size,
-            .height = size,
-          };
+        DrawRectangleRounded(rect, 0.1, 20, (Color) { 50, 50, 50, 255, });
 
-          if (game.buf[x][y].type == P_SOLDIER) {
-            DrawCircle(pos_x, pos_y, size/2, pcolor);
-            rlSetLineWidth(2);
-            DrawCircleLines(pos_x, pos_y, size/2, bcolor);
-          }
+        DrawTextEx(
+          regular_font,
+          "You won! ... or maybe not",
+          // todo: center text properly
+          (Vector2){ rect.x + rect.width/10, rect.y + rect.height/10 },
+          regular_font.baseSize,
+          1,
+          WHITE
+        );
 
-          if (game.buf[x][y].type == P_KING) {
-            DrawRectangleRec(rect, pcolor);
-            DrawRectangleLinesEx(rect, 2, bcolor);
-          }
+        ButtonList list = {
+          .count = 0,
+          .cap = 100,
+          .size = { rect.width/3, rect.height/5, },
+          .spacing = rect.width/50,
+        };
+        da_init(&list);
 
-          if (game.buf[x][y].type == P_PILLAR) {
-            DrawRectangleRec(rect, BEIGE);
-            DrawRectangleLinesEx(rect, 2, bcolor);
-          }
+        // todo: adjust everything for text
+
+        Button new_game = {
+          .text = "New game",
+          .pos = {
+            rect.x + 0.5 * rect.width - list.size.x / 2,
+            rect.y + 0.4 * rect.height - list.size.y / 2,
+          },
+        };
+        push_button(&list, &new_game);
+
+        Button leave = { .text = "Exit", };
+        push_button(&list, &leave);
+
+        for (int i = 0; i < list.count; i++) {
+          draw_button(list.items[i]);
         }
-      }
 
-      if (mode == MODE_TARGET) {
-        Moves *moves = &game.moves[src_x][src_y];
-        for (int i = 0; i < moves->num_moves; i++) {
-          DrawCircle(
-            (moves->c[i][0] + 0.5) * unit,
-            (moves->c[i][1] + 0.5) * unit,
-            unit * 0.2,
-            (Color) { 50, 50, 50, 50, }
-          );
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+          if (mouse_in(&new_game)) {
+            fill_from_fen(&game, fen);
+            mode = MODE_SRC;
+            sel.x = sel.y = 0;
+          }
+
+          if (mouse_in(&leave)) exit(0);
         }
       }
     }

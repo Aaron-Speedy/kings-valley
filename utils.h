@@ -4,12 +4,17 @@
 #define min(x, y) ((x) < (y) ? (x) : (y))
 #define max(x, y) ((x) > (y) ? (x) : (y))
 
+typedef struct {
+  int x, y;
+} Vec2I;
+
 float randf(float min, float max);
 int randi(int min, int max);
 int sign(int x);
 void clampf(float *x, float min, float max);
 void clampi(int *x, int min, int max);
 int in_bounds(int x, int max);
+int vec2i_at(Vec2I vec, int index);
 
 #define da_append(xs, x) \
   do { \
@@ -21,6 +26,11 @@ int in_bounds(int x, int max);
  \
     (xs)->items[(xs)->count++] = (x); \
   } while (0)
+
+#define da_init(xs) \
+do { \
+  (xs)->items = malloc((xs)->cap * sizeof((xs)->items[0])); \
+} while (0);
 
 #ifdef UTILS_IMPL
 #define UTILS_IMPL
@@ -56,6 +66,17 @@ int in_bounds(int x, int max) {
   if (x < 0) return 0;
   if (x >= max) return 0;
   return 1;
+}
+
+int vec2i_at(Vec2I vec, int index) {
+  switch (index) {
+    case 0:
+      return vec.x;
+    case 1:
+      return vec.y;
+    default:
+      assert(!"Out of bounds");
+  }
 }
 
 #endif
