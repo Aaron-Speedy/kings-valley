@@ -355,8 +355,8 @@ int main(void) {
           .size.x = board_size * 0.7,
           .size.y = board_size * 0.5,
         };
-        rect.pos.x = (win_width - rect.size.x)/2;
-        rect.pos.y = (win_height - rect.size.y)/2;
+        rect.pos.x = (board_size - rect.size.x)/2;
+        rect.pos.y = (board_size - rect.size.y)/2;
 
         DrawRectangleRounded(
           rect_to_rectangle(&rect),
@@ -366,15 +366,6 @@ int main(void) {
           { 50, 50, 50, 255, }
         );
 
-        // DrawTextEx(
-        //   reg_font,
-        //   "You won! ... or maybe not",
-        //   // todo: center text properly
-        //   (Vec2){ rect.x + rect.width/10, rect.y + rect.height/10 },
-        //   reg_font.baseSize,
-        //   1,
-        //   WHITE
-        // );
         draw_text_rel(
           "You won! ... or maybe not",
           0.5, 0.15,
