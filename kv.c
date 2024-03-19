@@ -12,6 +12,8 @@
 #define UI_IMPL
 #include "ui.h"
 
+#define Vec2 Vector2
+
 #define BOARD_WIDTH 7
 #define BOARD_HEIGHT 7
 
@@ -209,12 +211,11 @@ void draw_square(Game *game, int x, int y, float unit, Color s_color) {
 
 int main(void) {
   SetConfigFlags(FLAG_MSAA_4X_HINT);
-  int window_width = 800, window_height = 600;
-  InitWindow(window_width, window_height, "King's Valley");
+  SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
+
+  InitWindow(800, 600, "King's Valley");
   SetTargetFPS(60);
   SetExitKey(KEY_Q);
-
-  regular_font = LoadFontEx("recs/regular.ttf", 20, 0, 0);
 
   Game game;
   char *fen = "sssKsss//1p3p1/3v3/1p3p1//SSSkSSS";
@@ -224,12 +225,24 @@ int main(void) {
     MODE_SRC,
     MODE_TARGET,
     MODE_END_MENU,
-  } mode = MODE_SRC;
+  } mode = MODE_END_MENU;
 
   Vec2I src = { 0, 0, };
   Vec2I sel = { 0, 0, };
 
+  int win_width = 0, win_height = 0;
+  float board_size = 0;
+
+  bool initial = true; // This is a terrible solution
+
   while (!WindowShouldClose()) {
+    if (IsWindowResized() || initial) {
+      win_width = GetScreenWidth();
+      win_height = GetScreenHeight();
+      board_size = min(win_width, win_height);
+      reg_font = LoadFontEx("recs/regular.ttf", board_size/30, 0, 0);
+    }
+
     /* ===== Input ===== */
     {
       Vec2I vel = { 0, 0, };
@@ -296,11 +309,9 @@ int main(void) {
     BeginDrawing();
     ClearBackground(BG_COLOR);
     {
-      float board_size = min(window_width, window_height);
-
       float unit = min(
-        window_width / BOARD_WIDTH,
-        window_height / BOARD_HEIGHT
+        win_width / BOARD_WIDTH,
+        win_height / BOARD_HEIGHT
       );
 
       for (int x = 0; x < BOARD_WIDTH; x++) {
@@ -340,41 +351,49 @@ int main(void) {
       }
 
       if (mode == MODE_END_MENU) {
-        Rectangle rect = {
-          .width = board_size * 0.7,
-          .height = board_size * 0.5,
+        Rect rect = {
+          .size.x = board_size * 0.7,
+          .size.y = board_size * 0.5,
         };
-        rect.x = (board_size - rect.width)/2;
-        rect.y = (board_size - rect.height)/2;
+        rect.pos.x = (win_width - rect.size.x)/2;
+        rect.pos.y = (win_height - rect.size.y)/2;
 
-        DrawRectangleRounded(rect, 0.1, 20, (Color) { 50, 50, 50, 255, });
+        DrawRectangleRounded(
+          rect_to_rectangle(&rect),
+          0.1,
+          20,
+          (Color)
+          { 50, 50, 50, 255, }
+        );
 
-        DrawTextEx(
-          regular_font,
+        // DrawTextEx(
+        //   reg_font,
+        //   "You won! ... or maybe not",
+        //   // todo: center text properly
+        //   (Vec2){ rect.x + rect.width/10, rect.y + rect.height/10 },
+        //   reg_font.baseSize,
+        //   1,
+        //   WHITE
+        // );
+        draw_text_rel(
           "You won! ... or maybe not",
-          // todo: center text properly
-          (Vector2){ rect.x + rect.width/10, rect.y + rect.height/10 },
-          regular_font.baseSize,
-          1,
-          WHITE
+          0.5, 0.15,
+          reg_font,
+          WHITE,
+          rect
         );
 
         ButtonList list = {
           .count = 0,
           .cap = 100,
-          .size = { rect.width/3, rect.height/5, },
-          .spacing = rect.width/50,
+          .size = { rect.size.x/3, rect.size.y/5, },
+          .spacing = rect.size.y/50,
         };
         da_init(&list);
 
-        // todo: adjust everything for text
-
         Button new_game = {
           .text = "New game",
-          .pos = {
-            rect.x + 0.5 * rect.width - list.size.x / 2,
-            rect.y + 0.4 * rect.height - list.size.y / 2,
-          },
+          .pos = place_rel(0.5, 0.4, list.size, rect),
         };
         push_button(&list, &new_game);
 
@@ -397,6 +416,8 @@ int main(void) {
       }
     }
     EndDrawing();
+
+    initial = false;
   }
 
   CloseWindow();
